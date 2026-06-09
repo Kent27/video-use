@@ -13,6 +13,6 @@
   "pacing":   { "talking_head_speed": 1.2, "open_cold_on_hook": true,
                 "boost_slow_regions": true, "slow_region_speed": 1.4 },
   "broll":    { "start_at_hook": true, "body_max_gap_s": 3, "fallback_to_animation": true },
-  "zoom":     { "emphasis_to": 1.27, "snap_s": 0.12, "center_x": 0.40, "center_y": 0.5,
+  "zoom":     { "emphasis_to": 1.27, "snap_s": 0.12, "center_x": 0.36, "center_y": 0.40,
                 "retention_after_hook": true, "retention_to": 1.27, "retention_dur": 2.5 }
 }

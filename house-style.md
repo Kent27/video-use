@@ -53,9 +53,9 @@ everywhere. Aim for ~4–5 B-rolls (each covering a whole concept beat) plus a f
   zoom beat.**
 - **Retention zoom:** when `zoom.retention_after_hook`, add a short zoom pulse ~2–3s after the
   hook (right after the first B-roll) via a windowed zoom, then let a B-roll come in after it.
-- **Anchor on the FACE, not the frame.** Set `zoom.center_x` (Kent's face sits ~0.40, left of
-  frame center) so he stays centered when it punches in; `center_y` defaults 0.5. A
-  frame-centered zoom on an off-center face looks "too left."
+- **Anchor on the FACE, not the frame**, on BOTH axes. Kent's face sits low-left in frame, so
+  `zoom.center_x` ≈ 0.36 and `zoom.center_y` ≈ 0.40 keep him center-center on the punch.
+  Frame-centered (`0.5/0.5`) leaves him "top-left" because his face is left of and above center.
 - **MECHANISM (Hard):** use `render.py`'s `zoom` field — a number (whole-segment) or
   `{"to","dur","cx","cy"}` (windowed pulse). It's a per-frame scale + center-crop, which is
   **sync-safe**. Do **NOT** use ffmpeg `zoompan` — its startup stutter holds the video while
