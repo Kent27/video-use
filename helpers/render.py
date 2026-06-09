@@ -197,6 +197,45 @@ def is_portrait_source(video: Path) -> bool:
 # -------- Per-segment extraction (Rule 2 + Rule 3) --------------------------
 
 
+def display_dims(video: Path) -> tuple[int, int]:
+    """Return the video's DISPLAY (w, h), accounting for rotation metadata."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height", "-of", "csv=p=0", str(video)],
+        capture_output=True, text=True, check=True,
+    )
+    w, h = map(int, out.stdout.strip().split(",")[:2])
+    rotation = 0
+    for entry in ("stream_side_data=rotation", "stream_tags=rotate"):
+        try:
+            r = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", entry,
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip().splitlines()
+            if r and r[0]:
+                rotation = int(float(r[0]))
+                break
+        except Exception:
+            continue
+    if abs(rotation) % 180 == 90:
+        w, h = h, w
+    return w, h
+
+
+def _scaled_target(source: Path, portrait: bool, target_h: int) -> tuple[int, int]:
+    """Output dims after the scale filter, for a zoompan s= value."""
+    dw, dh = display_dims(source)
+    if portrait:
+        th = target_h
+        tw = round(dw * th / dh)
+    else:
+        tw = 1280 if target_h == 1280 else 1920
+        th = round(dh * tw / dw)
+    return (tw + (tw % 2)), (th + (th % 2))
+
+
 def extract_segment(
     source: Path,
     seg_start: float,
@@ -205,6 +244,7 @@ def extract_segment(
     out_path: Path,
     preview: bool = False,
     draft: bool = False,
+    zoom: float | None = None,
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
@@ -228,6 +268,47 @@ def extract_segment(
     if is_hdr_source(source):
         vf_parts.append(TONEMAP_CHAIN)
     vf_parts.append(scale)
+    # Animated punch-in/out zoom (emphasis). zoompan keeps a fixed output size,
+    # so it works on video; sin(0→peak→0) over the segment = smooth in-out.
+    # Applied to the base BEFORE overlays/captions composite, so captions stay anchored.
+    # zoom can be a number (whole-segment punch) or {"to": peak, "dur": seconds}
+    # for a SHORT pulse at the segment start (then back to 1.0 for the rest).
+    zcx = zcy = 0.5   # zoom anchor (frame-center default; set per-video for off-center faces)
+    if zoom:
+        if isinstance(zoom, dict):
+            peak = float(zoom["to"])
+            zdur = float(zoom.get("dur", duration))
+            zcx = float(zoom.get("cx", 0.5))
+            zcy = float(zoom.get("cy", 0.5))
+        else:
+            peak = float(zoom)
+            zdur = duration
+    else:
+        peak = 1.0
+    if peak > 1.0:
+        fps = int(_hd("render.fps", 24))
+        n = max(2, round(duration * fps))
+        wn = min(n, max(2, round(zdur * fps)))    # zoom-pulse window in frames
+        amp = peak - 1.0
+        tw, th = _scaled_target(source, portrait, 1280 if draft else 1920)
+        # Immediate punch-in → hold → punch-out within the window, then 1.0.
+        ramp = max(2, round(0.12 * fps))          # ~0.12s snap
+        if 2 * ramp >= wn:
+            ramp = max(1, wn // 3)
+        hold_end = wn - ramp
+        # Per-frame scale + center-crop. Unlike zoompan this is 1 frame in → 1
+        # frame out with no startup hold, so audio can never drift (sync-safe).
+        z = (f"if(gte(n,{wn}),1,"
+             f"if(lt(n,{ramp}),1+{amp:.4f}*(n/{ramp}),"
+             f"if(lt(n,{hold_end}),1+{amp:.4f},"
+             f"1+{amp:.4f}*(({wn}-n)/{ramp}))))")
+        vf_parts.append(f"scale=w='iw*({z})':h='ih*({z})':eval=frame")
+        # center-crop back, anchored on (zcx, zcy) so an off-center face stays centered
+        vf_parts.append(
+            f"crop=w={tw}:h={th}"
+            f":x='max(0,min(in_w-{tw},in_w*{zcx}-{tw}/2))'"
+            f":y='max(0,min(in_h-{th},in_h*{zcy}-{th}/2))'"
+        )
     if grade_filter:
         vf_parts.append(grade_filter)
     vf = ",".join(vf_parts)
@@ -299,11 +380,14 @@ def extract_all_segments(
         else:
             seg_filter = resolved
 
+        zoom = r.get("zoom")
         note = r.get("beat") or r.get("note") or ""
-        print(f"  [{i:02d}] {src_name}  {start:7.2f}-{end:7.2f}  ({duration:5.2f}s)  {note}")
+        zmark = f"  zoom×{zoom}" if zoom else ""
+        print(f"  [{i:02d}] {src_name}  {start:7.2f}-{end:7.2f}  ({duration:5.2f}s)  {note}{zmark}")
         if is_auto:
             print(f"        grade: {seg_filter or '(none)'}")
-        extract_segment(src_path, start, duration, seg_filter, out_path, preview=preview, draft=draft)
+        extract_segment(src_path, start, duration, seg_filter, out_path,
+                        preview=preview, draft=draft, zoom=zoom)
         seg_paths.append(out_path)
 
     return seg_paths
