@@ -5,6 +5,10 @@ description: Edit any video by conversation. Transcribe, cut, color grade, gener
 
 # Video Use
 
+> **User config (Kent):** Before the Converse/Propose step, read `house-style.md`
+> and `house-defaults.json` in this skill's root and apply them. They override the
+> artistic-freedom defaults below, but never the Hard Rules.
+
 ## Principle
 
 1. **LLM reasons from raw transcript + on-demand visuals.** The only derived artifact that earns its keep is a packed phrase-level transcript (`takes_packed.md`). Everything else — filler tagging, retake detection, shot classification, emphasis scoring — you derive at decision time.
