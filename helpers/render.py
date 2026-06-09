@@ -273,16 +273,9 @@ def extract_segment(
     # Applied to the base BEFORE overlays/captions composite, so captions stay anchored.
     # zoom can be a number (whole-segment punch) or {"to": peak, "dur": seconds}
     # for a SHORT pulse at the segment start (then back to 1.0 for the rest).
-    zcx = zcy = 0.5   # zoom anchor (frame-center default; set per-video for off-center faces)
     if zoom:
-        if isinstance(zoom, dict):
-            peak = float(zoom["to"])
-            zdur = float(zoom.get("dur", duration))
-            zcx = float(zoom.get("cx", 0.5))
-            zcy = float(zoom.get("cy", 0.5))
-        else:
-            peak = float(zoom)
-            zdur = duration
+        peak = float(zoom["to"]) if isinstance(zoom, dict) else float(zoom)
+        zdur = float(zoom["dur"]) if isinstance(zoom, dict) and "dur" in zoom else duration
     else:
         peak = 1.0
     if peak > 1.0:
@@ -302,12 +295,12 @@ def extract_segment(
              f"if(lt(n,{ramp}),1+{amp:.4f}*(n/{ramp}),"
              f"if(lt(n,{hold_end}),1+{amp:.4f},"
              f"1+{amp:.4f}*(({wn}-n)/{ramp}))))")
+        # scale enlarges from the top-left, so center the crop per-frame using
+        # the same z expression (crop's default init-time centering would stay
+        # locked at z=1 → top-left). Offset = half the growth each axis.
         vf_parts.append(f"scale=w='iw*({z})':h='ih*({z})':eval=frame")
-        # center-crop back, anchored on (zcx, zcy) so an off-center face stays centered
         vf_parts.append(
-            f"crop=w={tw}:h={th}"
-            f":x='max(0,min(in_w-{tw},in_w*{zcx}-{tw}/2))'"
-            f":y='max(0,min(in_h-{th},in_h*{zcy}-{th}/2))'"
+            f"crop={tw}:{th}:x='{tw/2:.1f}*(({z})-1)':y='{th/2:.1f}*(({z})-1)'"
         )
     if grade_filter:
         vf_parts.append(grade_filter)

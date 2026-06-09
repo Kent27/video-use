@@ -23,10 +23,11 @@ Only what the skill doesn't already say:
 - **Open cold on the hook** — kill leading/trailing dead air; first frame = the hook line.
 - **B-roll:** prefer *authentic UI recreations* (HyperFrames) over abstract mockups.
   For brand/product topics, replicate the real product UI.
-- **B-roll cadence (retention):** start B-roll/visual at the **hook** (frame 0 region), not
-  just later. Through the **body**, never leave more than `broll.body_max_gap_s` (~3s) of bare
-  talking head after the previous B-roll ends — drop in another B-roll, or at minimum a small
-  animation/overlay (`broll.fallback_to_animation`). Something visual almost always on screen.
+- **B-roll rhythm (retention):** start a visual at the **hook**. Prefer **fewer, longer**
+  B-rolls that each carry a whole concept beat (`broll.prefer_fewer_longer`), with
+  **snap-zooms on emphasis** filling between (see *Emphasis zooms*). A zoom counts as
+  "something visual," so a bare-but-zoomed stretch is fine; just avoid long flat
+  talking-head with neither. Never leave more than ~`broll.body_max_gap_s` of nothing.
 - **Always ask my niche/business before writing example queries or business names**
   into graphics. Never invent a niche.
 
@@ -43,28 +44,19 @@ Only what the skill doesn't already say:
   speed), not one global atempo. Keep cuts on word boundaries; re-sync captions/overlays to the
   retimed segment offsets.
 
-## Snap zooms (emphasis + retention) + B-roll balance
-
-Fewer, longer B-rolls + punch-zooms on emphasis reads more confident than dense B-roll
-everywhere. Aim for ~4–5 B-rolls (each covering a whole concept beat) plus a few zooms.
-
-- **Emphasis zoom:** on an emphasized Indonesian phrase, punch IN immediately (`zoom.snap_s`
-  ≈0.12s) to `zoom.emphasis_to` (~127%), hold through the phrase, snap OUT. **No B-roll on a
-  zoom beat.**
-- **Retention zoom:** when `zoom.retention_after_hook`, add a short zoom pulse ~2–3s after the
-  hook (right after the first B-roll) via a windowed zoom, then let a B-roll come in after it.
-- **Anchor on the FACE, not the frame**, on BOTH axes. Kent's face sits low-left in frame, so
-  `zoom.center_x` ≈ 0.36 and `zoom.center_y` ≈ 0.40 keep him center-center on the punch.
-  Frame-centered (`0.5/0.5`) leaves him "top-left" because his face is left of and above center.
-- **MECHANISM (Hard):** use `render.py`'s `zoom` field — a number (whole-segment) or
-  `{"to","dur","cx","cy"}` (windowed pulse). It's a per-frame scale + center-crop, which is
-  **sync-safe**. Do **NOT** use ffmpeg `zoompan` — its startup stutter holds the video while
-  audio runs on, desyncing lip-sync.
-
-## Overlay / caption placement
-- Graphics/B-roll cards live in the **top region** (above the speaker's eyes); captions in the
-  **lower third**. Keeps the face clear and avoids collisions. (Tuned for Kent's centered-ish
-  vertical selfie framing — adjust to the actual subject.)
+## Emphasis zooms (snap-in)
+- On emphasized Indonesian phrases, **snap-zoom** the face: immediate punch-in
+  (~`zoom.snap_seconds` 0.12s) to ~`zoom.emphasis_peak` (1.27×), **hold** through the
+  phrase, snap back out. NOT a slow ramp.
+- **A zoom and a B-roll don't stack** — when a beat gets a zoom, it gets no B-roll, and
+  vice-versa.
+- The **hook uses B-roll, not a zoom** (`zoom.hook_uses_broll`). Add a short **retention
+  zoom** ~2–3s after the hook B-roll (`zoom.retention_after_hook`, pulse length
+  `zoom.retention_pulse_seconds`) to re-grab attention.
+- Implementation: the render.py **`zoom` field** on an EDL range — a number (whole-segment
+  punch) or `{"to": peak, "dur": seconds}` for a short pulse inside a longer beat. It's a
+  per-frame **scale + center-crop** (1 frame in → 1 frame out, re-centered every frame).
+  **Never `zoompan`** — it stutters on startup and drifts A/V sync.
 
 ## Dual-language captions (Indonesian + English)
 
