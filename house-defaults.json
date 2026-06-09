@@ -6,6 +6,14 @@
   "audio":    { "loudness_i": -14.0, "loudness_tp": -1.0, "loudness_lra": 11.0 },
   "grade":    { "default_preset": "neutral_punch" },
   "look":     { "accent_hex": "#4285F4", "card_bg_hex": "#0F1115", "single_accent": true },
-  "captions": { "style": "clean-phrase", "max_words": 4, "case": "sentence", "margin_v": 90 },
-  "pacing":   { "talking_head_speed": 1.2, "open_cold_on_hook": true }
+  "captions": { "style": "clean-phrase", "max_words": 4, "case": "sentence", "margin_v": 90,
+                "dual_language": true, "primary_lang": "id", "secondary_lang": "en",
+                "separate_pills": true, "secondary_scale": 1.0,
+                "primary_color": "#F5F5F5", "secondary_color": "#8AB4F8", "secondary_border": "#4285F4" },
+  "pacing":   { "talking_head_speed": 1.2, "open_cold_on_hook": true,
+                "boost_slow_regions": true, "slow_region_speed": 1.4 },
+  "broll":    { "start_at_hook": true, "body_max_gap_s": 3, "fallback_to_animation": true,
+                "prefer_fewer_longer": true },
+  "zoom":     { "emphasis_peak": 1.27, "snap_seconds": 0.12, "hook_uses_broll": true,
+                "retention_after_hook": true, "retention_pulse_seconds": 2.5 }
 }
