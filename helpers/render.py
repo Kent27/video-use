@@ -38,6 +38,30 @@ except Exception:
         return "eq=contrast=1.03:saturation=0.98", {}
 
 
+# -------- House defaults (user config) --------------------------------------
+#
+# Deterministic defaults live in house-defaults.json next to the skill root so
+# they can be edited in one place. Every lookup falls back to the built-in
+# value if the file is missing or a key is absent — the pipeline never depends
+# on the config existing.
+_DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "house-defaults.json"
+try:
+    HOUSE_DEFAULTS = json.loads(_DEFAULTS_PATH.read_text())
+except Exception:
+    HOUSE_DEFAULTS = {}
+
+
+def _hd(dotted_key: str, fallback):
+    """Read a nested key like 'render.crf_final' from house-defaults.json."""
+    node = HOUSE_DEFAULTS
+    for part in dotted_key.split("."):
+        if isinstance(node, dict) and part in node:
+            node = node[part]
+        else:
+            return fallback
+    return node
+
+
 # -------- Subtitle style (bold-overlay, proven at 1920×1080 and 1080×1920) --
 #
 # MarginV is NOT taste — it is a platform safe-zone rule.
@@ -132,7 +156,13 @@ def is_hdr_source(video: Path) -> bool:
 
 
 def is_portrait_source(video: Path) -> bool:
-    """Return True if the video's height > width (portrait / vertical)."""
+    """Return True if the video DISPLAYS taller than wide (portrait / vertical).
+
+    Honors rotation metadata: phone clips are often stored landscape
+    (e.g. 1920x1080) with a 90/270° rotation flag so they display portrait.
+    Reading only stored width/height misjudges these as landscape and the
+    extract upscales the already-rotated frame (e.g. to 1920x3414).
+    """
     try:
         out = subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "v:0",
@@ -140,10 +170,28 @@ def is_portrait_source(video: Path) -> bool:
              "-of", "csv=p=0", str(video)],
             capture_output=True, text=True, check=True,
         )
-        w, h = map(int, out.stdout.strip().split(","))
-        return h > w
+        w, h = map(int, out.stdout.strip().split(",")[:2])
     except Exception:
         return False
+
+    rotation = 0
+    for entry in ("stream_side_data=rotation", "stream_tags=rotate"):
+        try:
+            r = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", entry,
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip().splitlines()
+            if r and r[0]:
+                rotation = int(float(r[0]))
+                break
+        except Exception:
+            continue
+
+    if abs(rotation) % 180 == 90:  # 90 or 270 → display dims are swapped
+        w, h = h, w
+    return h > w
 
 
 # -------- Per-segment extraction (Rule 2 + Rule 3) --------------------------
@@ -189,11 +237,11 @@ def extract_segment(
     af = f"afade=t=in:st=0:d=0.03,afade=t=out:st={fade_out_start:.3f}:d=0.03"
 
     if draft:
-        preset, crf = "ultrafast", "28"
+        preset, crf = "ultrafast", str(_hd("render.crf_draft", 28))
     elif preview:
-        preset, crf = "medium", "22"
+        preset, crf = "medium", str(_hd("render.crf_preview", 22))
     else:
-        preset, crf = "fast", "20"
+        preset, crf = "fast", str(_hd("render.crf_final", 20))
 
     cmd = [
         "ffmpeg", "-y",
@@ -203,7 +251,7 @@ def extract_segment(
         "-vf", vf,
         "-af", af,
         "-c:v", "libx264", "-preset", preset, "-crf", crf,
-        "-pix_fmt", "yuv420p", "-r", "24",
+        "-pix_fmt", "yuv420p", "-r", str(_hd("render.fps", 24)),
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart",
         str(out_path),
@@ -224,7 +272,7 @@ def extract_all_segments(
     `auto_grade_for_clip` and apply a per-segment subtle correction.
     Otherwise, apply the same preset/raw filter to every segment.
     """
-    resolved = resolve_grade_filter(edl.get("grade"))
+    resolved = resolve_grade_filter(edl.get("grade") or _hd("grade.default_preset", None))
     is_auto = resolved == "__AUTO__"
     clips_dir = edit_dir / (
         "clips_draft" if draft else ("clips_preview" if preview else "clips_graded")
@@ -389,9 +437,9 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
 
 # Social-media standard: -14 LUFS integrated, -1 dBTP peak, LRA 11 LU.
 # Matches YouTube / Instagram / TikTok / X / LinkedIn normalization targets.
-LOUDNORM_I = -14.0
-LOUDNORM_TP = -1.0
-LOUDNORM_LRA = 11.0
+LOUDNORM_I = float(_hd("audio.loudness_i", -14.0))
+LOUDNORM_TP = float(_hd("audio.loudness_tp", -1.0))
+LOUDNORM_LRA = float(_hd("audio.loudness_lra", 11.0))
 
 
 def measure_loudness(video_path: Path) -> dict[str, str] | None:
