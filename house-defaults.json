@@ -2,6 +2,7 @@
   "_comment": "Kent's deterministic video-use defaults. render.py auto-reads render.*, audio.*, grade.default_preset (with built-in fallbacks if this file is missing). The remaining keys are read by the editing agent each session — single source of truth, edit values here.",
 
   "format":   { "aspect": "vertical", "width": 1080, "height": 1920, "fps": 24 },
+  "safe_zone": { "top_px": 120, "bottom_px": 320 },
   "render":   { "fps": 24, "crf_final": 20, "crf_preview": 22, "crf_draft": 28 },
   "audio":    { "loudness_i": -14.0, "loudness_tp": -1.0, "loudness_lra": 11.0 },
   "grade":    { "default_preset": "neutral_punch" },

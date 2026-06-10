@@ -30,6 +30,13 @@ Only what the skill doesn't already say:
   talking-head with neither. Never leave more than ~`broll.body_max_gap_s` of nothing.
 - **Always ask my niche/business before writing example queries or business names**
   into graphics. Never invent a niche.
+- **Platform safe zones (top status bar + bottom UI).** Keep identifying/critical content out of
+  the top `safe_zone.top_px` (~120px — phone status-bar clock/icons cover it) and the bottom
+  `safe_zone.bottom_px` (~320px — caption/like/share UI). Captions already honor this via
+  `margin_v`. The trap is **full-bleed B-roll** (e.g. a WhatsApp mockup): its header/contact-name
+  sits at the very top edge and gets covered. Fix: extend the header's background colour up under
+  the status bar but push the header *content* (avatar/name) down below `top_px` — that's also how
+  the real iOS app renders. Recreated-UI mockups that fill the frame must respect this.
 
 ## Mechanisms not in the skill
 - **Talking-head speed-up:** default a global ~`pacing.talking_head_speed`× pitch-preserved
